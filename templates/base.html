@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}HabitFlow{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── Sidebar (desktop) ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">🌱</span>
+      <span class="brand-name">HabitFlow</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="{{ url_for('dashboard') }}"
+         class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}">
+        <i class="fa-solid fa-house"></i><span>Dashboard</span>
+      </a>
+      <a href="{{ url_for('analytics') }}"
+         class="nav-link {{ 'active' if request.endpoint == 'analytics' }}">
+        <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
+      </a>
+      <a href="{{ url_for('export_csv') }}" class="nav-link">
+        <i class="fa-solid fa-file-csv"></i><span>Export CSV</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-date">
+      <div id="sb-day" class="sb-day"></div>
+      <div id="sb-date" class="sb-date-text"></div>
+    </div>
+  </aside>
+
+  <!-- ── Main ──────────────────────────────────────────── -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- ── Mobile bottom nav ───────────────────────────────── -->
+<nav class="mobile-nav">
+  <a href="{{ url_for('dashboard') }}"
+     class="mob-item {{ 'active' if request.endpoint == 'dashboard' }}">
+    <i class="fa-solid fa-house"></i><span>Home</span>
+  </a>
+  <a href="{{ url_for('analytics') }}"
+     class="mob-item {{ 'active' if request.endpoint == 'analytics' }}">
+    <i class="fa-solid fa-chart-line"></i><span>Analytics</span>
+  </a>
+  <button class="mob-item mob-fab" onclick="openModal('modalAddHabit')">
+    <i class="fa-solid fa-plus"></i><span>Add</span>
+  </button>
+  <a href="{{ url_for('export_csv') }}" class="mob-item">
+    <i class="fa-solid fa-download"></i><span>Export</span>
+  </a>
+</nav>
+
+<!-- ── Add Habit Modal ─────────────────────────────────── -->
+<div class="modal-backdrop" id="modalAddHabit" onclick="backdropClose(event,'modalAddHabit')">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-seedling"></i> New Habit</h3>
+      <button class="modal-close" onclick="closeModal('modalAddHabit')">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <form action="{{ url_for('create_habit_route') }}" method="POST" class="habit-form">
+      <div class="form-group">
+        <label>Name <span class="req">*</span></label>
+        <input type="text" name="name" placeholder="e.g. Morning Run" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <input type="text" name="description" placeholder="Optional…">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category" id="newCat" onchange="syncCategoryDefaults()">
+            <option value="general">✨ General</option>
+            <option value="health">💊 Health</option>
+            <option value="fitness">💪 Fitness</option>
+            <option value="work">💼 Work</option>
+            <option value="learning">📚 Learning</option>
+            <option value="mindfulness">🧘 Mindfulness</option>
+            <option value="social">👥 Social</option>
+            <option value="finance">💰 Finance</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequency</label>
+          <select name="frequency">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="custom">Custom Days</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Target</label>
+          <input type="number" name="target_value" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Unit</label>
+          <input type="text" name="unit" placeholder="times" value="times">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" name="color" id="newColor" value="#6366f1">
+        </div>
+        <div class="form-group">
+          <label>Icon (emoji)</label>
+          <input type="text" name="icon" id="newIcon" placeholder="✨" maxlength="2" class="emoji-input">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('modalAddHabit')">Cancel</button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fa-solid fa-plus"></i> Create
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

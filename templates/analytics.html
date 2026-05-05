@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Analytics — HabitFlow{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="header-left">
+    <p class="greeting">Insights 📊</p>
+    <h1 class="page-title">Analytics</h1>
+  </div>
+</div>
+
+<!-- ── Stats strip ──────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stat-card">
+    <i class="fa-solid fa-seedling stat-icon" style="color:#10b981"></i>
+    <div>
+      <div class="stat-value">{{ stats.total_habits }}</div>
+      <div class="stat-label">Active Habits</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <i class="fa-solid fa-fire stat-icon" style="color:#f59e0b"></i>
+    <div>
+      <div class="stat-value">{{ stats.best_streak }}</div>
+      <div class="stat-label">Best Streak</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <i class="fa-solid fa-bolt stat-icon" style="color:#6366f1"></i>
+    <div>
+      <div class="stat-value">{{ stats.total_logs }}</div>
+      <div class="stat-label">Total Logs</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <i class="fa-solid fa-percent stat-icon" style="color:#ec4899"></i>
+    <div>
+      <div class="stat-value">{{ stats.completion_rate }}%</div>
+      <div class="stat-label">Today's Rate</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Annual heatmap ───────────────────────────────────── -->
+<section class="section">
+  <h2 class="section-title">Year Activity</h2>
+  <div class="heatmap-wrap annual">
+    <div class="annual-heatmap" id="annualHeatmap"></div>
+    <div class="heatmap-legend">
+      <span>Less</span>
+      <div class="legend-cell" style="background:#e2e8f0"></div>
+      <div class="legend-cell" style="background:#a5f3d0"></div>
+      <div class="legend-cell" style="background:#34d399"></div>
+      <div class="legend-cell" style="background:#059669"></div>
+      <span>More</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── Charts row ───────────────────────────────────────── -->
+<div class="charts-row">
+  <section class="section chart-section">
+    <h2 class="section-title">Category Breakdown</h2>
+    <div class="chart-wrap chart-sm">
+      <canvas id="catChart"></canvas>
+    </div>
+  </section>
+
+  <section class="section chart-section">
+    <h2 class="section-title">Weekly Activity</h2>
+    <div class="chart-wrap chart-sm">
+      <canvas id="weekChart"></canvas>
+    </div>
+  </section>
+</div>
+
+<!-- ── Leaderboard ──────────────────────────────────────── -->
+<section class="section">
+  <h2 class="section-title">Habit Leaderboard</h2>
+  {% if top_habits %}
+  <div class="leaderboard">
+    {% for h in top_habits %}
+    <a href="{{ url_for('habit_detail', habit_id=h.id) }}" class="leader-row">
+      <span class="leader-rank">{{ loop.index }}</span>
+      <span class="leader-icon">{{ h.icon }}</span>
+      <div class="leader-info">
+        <span class="leader-name">{{ h.name }}</span>
+        <span class="cat-badge cat-{{ h.category }}">{{ h.category }}</span>
+      </div>
+      <div class="leader-stats">
+        <span class="leader-streak">{{ h.current_streak }} 🔥</span>
+        <span class="leader-best">Best: {{ h.best_streak }}</span>
+        <span class="leader-total">{{ h.total_completions }} days</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="empty-inline">No habits yet.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HEATMAP_DATA  = {{ heatmap }};
+const CATEGORY_DATA = {{ categories_data }};
+const WEEKLY_DATA   = {{ weekly }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderAnnualHeatmap('annualHeatmap', HEATMAP_DATA);
+  renderCategoryChart('catChart', CATEGORY_DATA);
+  renderWeeklyChart('weekChart', WEEKLY_DATA);
+});
+</script>
+{% endblock %}

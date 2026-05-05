@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HabitFlow{% endblock %}
+
+{% block content %}
+
+<!-- ── Page header ──────────────────────────────────────── -->
+<div class="page-header">
+  <div class="header-left">
+    <p class="greeting">{{ greeting }} 👋</p>
+    <h1 class="page-title">Today's Habits</h1>
+    <p class="header-date">{{ today }}</p>
+  </div>
+  <div class="header-right">
+    <div class="completion-ring-wrap">
+      <svg class="completion-ring" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="34" class="ring-bg"/>
+        <circle cx="40" cy="40" r="34" class="ring-fg"
+                id="ringFg"
+                style="--pct: {{ stats.completion_rate }}"/>
+      </svg>
+      <div class="ring-label">
+        <span class="ring-pct">{{ stats.completion_rate }}%</span>
+        <span class="ring-sub">done</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats strip ──────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stat-card">
+    <i class="fa-solid fa-list-check stat-icon" style="color:#6366f1"></i>
+    <div>
+      <div class="stat-value">{{ stats.completed_today }}/{{ stats.total_habits }}</div>
+      <div class="stat-label">Completed</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <i class="fa-solid fa-fire stat-icon" style="color:#f59e0b"></i>
+    <div>
+      <div class="stat-value">{{ stats.best_streak }}</div>
+      <div class="stat-label">Best Streak</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <i class="fa-solid fa-calendar-check stat-icon" style="color:#10b981"></i>
+    <div>
+      <div class="stat-value">{{ stats.total_logs }}</div>
+      <div class="stat-label">Total Logs</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Habit grid ────────────────────────────────────────── -->
+{% if habits %}
+<div class="habit-grid" id="habitGrid">
+  {% for h in habits %}
+  <div class="habit-card {{ 'done' if h.logged_today }}"
+       id="card-{{ h.id }}"
+       style="--hc: {{ h.color }}">
+
+    <div class="hcard-top">
+      <a href="{{ url_for('habit_detail', habit_id=h.id) }}" class="hcard-icon-link">
+        <div class="hcard-icon">{{ h.icon }}</div>
+      </a>
+      <div class="hcard-meta">
+        <a href="{{ url_for('habit_detail', habit_id=h.id) }}" class="hcard-name">{{ h.name }}</a>
+        <span class="cat-badge cat-{{ h.category }}">{{ h.category }}</span>
+      </div>
+      <div class="hcard-streak {{ 'hot' if h.streak >= 3 }}">
+        {% if h.streak > 0 %}
+          <span class="streak-num">{{ h.streak }}</span>
+          <span class="streak-fire">🔥</span>
+        {% else %}
+          <span class="streak-zero">—</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if h.description %}
+    <p class="hcard-desc">{{ h.description }}</p>
+    {% endif %}
+
+    <button class="log-btn {{ 'logged' if h.logged_today }}"
+            id="logbtn-{{ h.id }}"
+            onclick="toggleLog({{ h.id }}, this)">
+      {% if h.logged_today %}
+        <i class="fa-solid fa-check"></i> Done Today
+      {% else %}
+        <i class="fa-regular fa-circle"></i> Log Today
+      {% endif %}
+    </button>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🌱</div>
+  <h3>No habits yet</h3>
+  <p>Start building better habits today.</p>
+  <button class="btn btn-primary" onclick="openModal('modalAddHabit')">
+    <i class="fa-solid fa-plus"></i> Add First Habit
+  </button>
+</div>
+{% endif %}
+
+<!-- ── FAB ──────────────────────────────────────────────── -->
+<button class="fab" onclick="openModal('modalAddHabit')" title="Add habit">
+  <i class="fa-solid fa-plus"></i>
+</button>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Animate ring on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const ring = document.getElementById('ringFg');
+    if (ring) {
+      const pct = parseFloat(ring.style.getPropertyValue('--pct')) || 0;
+      const circ = 2 * Math.PI * 34;
+      ring.style.strokeDasharray = circ;
+      ring.style.strokeDashoffset = circ * (1 - pct / 100);
+    }
+  });
+</script>
+{% endblock %}
