@@ -1,0 +1,32 @@
+[
+    {
+        "habit": "Chanting 16 rounds daily",
+        "value": 16,
+        "date": "2026-05-03"
+    },
+    {
+        "habit": "eat",
+        "value": 1,
+        "date": "2026-05-03"
+    },
+    {
+        "habit": "sleep",
+        "value": 2,
+        "date": "2026-05-03"
+    },
+    {
+        "habit": "gym",
+        "value": 4,
+        "date": "2026-05-03"
+    },
+    {
+        "habit": "gym",
+        "value": 5,
+        "date": "2026-05-03"
+    },
+    {
+        "habit": "gym",
+        "value": 3,
+        "date": "2026-05-03"
+    }
+]

@@ -1,14 +1,22 @@
 import io
+import os
 import csv
 import json
 from datetime import datetime
 
 from flask import (
     Flask, render_template, request, jsonify,
-    redirect, url_for, send_file,
+    redirect, url_for, send_file, flash,
+)
+from flask_login import (
+    LoginManager, login_user, logout_user, login_required, current_user,
 )
 
 from tracker.database import init_db, CATEGORY_DEFAULTS
+from tracker.auth import (
+    get_user_by_id, get_user_by_email, create_user, verify_password,
+    verify_google_token, login_or_create_google_user, GOOGLE_CLIENT_ID,
+)
 from tracker.logic import (
     add_habit, get_habits_with_status, toggle_log,
     get_habit_stats, get_habit_calendar,
@@ -21,9 +29,26 @@ from tracker.analytics import (
     dashboard_stats, weekly_activity, category_breakdown,
     completion_heatmap, top_habits, trend_data,
 )
+from tracker.api import api
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change-me")
 init_db()
+
+# ── Login manager ─────────────────────────────────────────────────────────────
+
+login_manager = LoginManager(app)
+login_manager.login_view = "login"
+login_manager.login_message = "Please sign in to continue."
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return get_user_by_id(int(user_id))
+
+
+# Register API blueprint
+app.register_blueprint(api)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -37,12 +62,76 @@ def _greeting():
     return "Good evening"
 
 
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        user = verify_password(email, password)
+        if user:
+            login_user(user, remember=True)
+            return redirect(request.args.get("next") or url_for("dashboard"))
+        flash("Invalid email or password.", "error")
+    return render_template("login.html", google_client_id=GOOGLE_CLIENT_ID)
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        name = request.form.get("name", "").strip()
+        if not email or not password or len(password) < 6:
+            flash("Email and password (at least 6 characters) required.", "error")
+        elif get_user_by_email(email):
+            flash("An account with that email already exists.", "error")
+        else:
+            user_id = create_user(email, password, name or None)
+            login_user(get_user_by_id(user_id), remember=True)
+            return redirect(url_for("dashboard"))
+    return render_template("signup.html", google_client_id=GOOGLE_CLIENT_ID)
+
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for("login"))
+
+
+@app.route("/auth/google", methods=["POST"])
+def google_login():
+    """Receives the ID token from Google Sign-In button (web)."""
+    id_token = request.form.get("credential") or request.json.get("credential")
+    info = verify_google_token(id_token)
+    if not info:
+        flash("Google sign-in failed.", "error")
+        return redirect(url_for("login"))
+    user = login_or_create_google_user(info)
+    login_user(user, remember=True)
+    return redirect(url_for("dashboard"))
+
+
+@app.route("/profile")
+@login_required
+def profile():
+    stats = dashboard_stats(current_user.id)
+    return render_template("profile.html", stats=stats, user=current_user)
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def dashboard():
-    habits = get_habits_with_status()
-    stats  = dashboard_stats()
+    habits = get_habits_with_status(current_user.id)
+    stats  = dashboard_stats(current_user.id)
     return render_template(
         "index.html",
         habits=habits,
@@ -56,11 +145,13 @@ def dashboard():
 # ── Habit CRUD ─────────────────────────────────────────────────────────────────
 
 @app.route("/habits/create", methods=["POST"])
+@login_required
 def create_habit_route():
     name = request.form.get("name", "").strip()
     if not name:
         return redirect(url_for("dashboard"))
     add_habit(
+        user_id=current_user.id,
         name=name,
         description=request.form.get("description", ""),
         category=request.form.get("category", "general"),
@@ -75,14 +166,15 @@ def create_habit_route():
 
 
 @app.route("/habits/<int:habit_id>")
+@login_required
 def habit_detail(habit_id):
-    habit = get_habit(habit_id)
+    habit = get_habit(current_user.id, habit_id)
     if not habit:
         return redirect(url_for("dashboard"))
-    stats    = get_habit_stats(habit_id)
-    calendar = get_habit_calendar(habit_id, weeks=12)
-    logs     = get_logs_for_habit(habit_id, limit=30)
-    trend    = trend_data(habit_id, weeks=8)
+    stats    = get_habit_stats(current_user.id, habit_id)
+    calendar = get_habit_calendar(current_user.id, habit_id, weeks=12)
+    logs     = get_logs_for_habit(current_user.id, habit_id, limit=30)
+    trend    = trend_data(current_user.id, habit_id, weeks=8)
     return render_template(
         "habit_detail.html",
         habit=habit,
@@ -95,9 +187,10 @@ def habit_detail(habit_id):
 
 
 @app.route("/habits/<int:habit_id>/edit", methods=["POST"])
+@login_required
 def edit_habit(habit_id):
     update_habit(
-        habit_id,
+        current_user.id, habit_id,
         name=request.form.get("name", "").strip(),
         description=request.form.get("description", ""),
         category=request.form.get("category", "general"),
@@ -111,16 +204,18 @@ def edit_habit(habit_id):
 
 
 @app.route("/habits/<int:habit_id>/delete", methods=["POST"])
+@login_required
 def delete_habit_route(habit_id):
-    delete_habit(habit_id)
+    delete_habit(current_user.id, habit_id)
     return redirect(url_for("dashboard"))
 
 
 # ── One-tap logging (AJAX) ────────────────────────────────────────────────────
 
 @app.route("/habits/<int:habit_id>/log", methods=["POST"])
+@login_required
 def log_route(habit_id):
-    logged, streak = toggle_log(habit_id)
+    logged, streak = toggle_log(current_user.id, habit_id)
     if request.is_json or request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify({"logged": logged, "streak": streak})
     return redirect(url_for("dashboard"))
@@ -129,12 +224,13 @@ def log_route(habit_id):
 # ── Analytics ─────────────────────────────────────────────────────────────────
 
 @app.route("/analytics")
+@login_required
 def analytics():
-    stats    = dashboard_stats()
-    heatmap  = completion_heatmap(weeks=52)
-    cats     = category_breakdown()
-    leaders  = top_habits()
-    weekly   = weekly_activity()
+    stats    = dashboard_stats(current_user.id)
+    heatmap  = completion_heatmap(current_user.id, weeks=52)
+    cats     = category_breakdown(current_user.id)
+    leaders  = top_habits(current_user.id)
+    weekly   = weekly_activity(current_user.id)
     return render_template(
         "analytics.html",
         stats=stats,
@@ -149,10 +245,11 @@ def analytics():
 # ── Export ────────────────────────────────────────────────────────────────────
 
 @app.route("/export/csv")
+@login_required
 def export_csv():
-    habits    = get_all_habits(include_inactive=True)
+    habits    = get_all_habits(current_user.id, include_inactive=True)
     habit_map = {h["id"]: h["name"] for h in habits}
-    logs      = get_all_logs()
+    logs      = get_all_logs(current_user.id)
 
     buf = io.StringIO()
     w   = csv.writer(buf)

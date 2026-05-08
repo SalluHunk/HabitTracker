@@ -39,10 +39,38 @@
       <div id="sb-day" class="sb-day"></div>
       <div id="sb-date" class="sb-date-text"></div>
     </div>
+
+    {% if current_user.is_authenticated %}
+    <div class="sidebar-user">
+      <a href="{{ url_for('profile') }}" class="user-card {{ 'active' if request.endpoint == 'profile' }}">
+        {% if current_user.avatar_url %}
+          <img src="{{ current_user.avatar_url }}" alt="" class="user-avatar">
+        {% else %}
+          <div class="user-avatar user-avatar-fallback">{{ current_user.name[0]|upper }}</div>
+        {% endif %}
+        <div class="user-meta">
+          <div class="user-name">{{ current_user.name }}</div>
+          <div class="user-email">{{ current_user.email }}</div>
+        </div>
+      </a>
+      <a href="{{ url_for('logout') }}" class="logout-link">
+        <i class="fa-solid fa-right-from-bracket"></i> Sign out
+      </a>
+    </div>
+    {% endif %}
   </aside>
 
   <!-- ── Main ──────────────────────────────────────────── -->
   <main class="main-content">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% if msgs %}
+        <div class="flash-stack">
+          {% for cat, msg in msgs %}
+            <div class="flash flash-{{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
     {% block content %}{% endblock %}
   </main>
 </div>

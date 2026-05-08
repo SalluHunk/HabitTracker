@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Profile · HabitFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <p class="greeting">Account</p>
+    <h1 class="page-title">Profile</h1>
+  </div>
+</div>
+
+<div class="profile-card">
+  <div class="profile-top">
+    {% if user.avatar_url %}
+      <img src="{{ user.avatar_url }}" alt="" class="profile-avatar">
+    {% else %}
+      <div class="profile-avatar profile-avatar-fallback">{{ user.name[0]|upper }}</div>
+    {% endif %}
+    <div>
+      <h2 class="profile-name">{{ user.name }}</h2>
+      <p class="profile-email">{{ user.email }}</p>
+      {% if user.google_id %}
+        <span class="profile-badge"><i class="fa-brands fa-google"></i> Google account</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="stat-strip">
+  <div class="stat-card"><div class="stat-icon">🌱</div><div class="stat-num">{{ stats.total_habits }}</div><div class="stat-lbl">Active Habits</div></div>
+  <div class="stat-card"><div class="stat-icon">🔥</div><div class="stat-num">{{ stats.best_streak }}</div><div class="stat-lbl">Best Streak</div></div>
+  <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num">{{ stats.total_logs }}</div><div class="stat-lbl">Total Logs</div></div>
+  <div class="stat-card"><div class="stat-icon">%</div><div class="stat-num">{{ stats.completion_rate }}%</div><div class="stat-lbl">Today</div></div>
+</div>
+
+<div class="profile-actions">
+  <a href="{{ url_for('export_csv') }}" class="btn btn-ghost"><i class="fa-solid fa-file-csv"></i> Export My Data</a>
+  <a href="{{ url_for('logout') }}" class="btn btn-danger"><i class="fa-solid fa-right-from-bracket"></i> Sign out</a>
+</div>
+{% endblock %}
