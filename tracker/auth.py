@@ -1,10 +1,11 @@
-"""Authentication: password hashing, JWT, Google ID token verification."""
+"""Authentication: password hashing, JWT, Google ID token verification, password reset."""
 import os
 import jwt
+import secrets
 from datetime import datetime, timedelta, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-from tracker.db import query_one, insert_returning_id, execute
+from tracker.db import query_one, query_all, insert_returning_id, execute
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 JWT_ALG = "HS256"
@@ -117,6 +118,53 @@ def verify_google_token(id_token_str: str):
         }
     except Exception:
         return None
+
+
+# ── Password reset (6-digit code) ──────────────────────────────────────────────
+
+RESET_CODE_TTL_MINUTES = 15
+
+
+def create_password_reset(user_id: int) -> str:
+    """Generate a 6-digit code, store its hash, return the plaintext code."""
+    code = f"{secrets.randbelow(1000000):06d}"
+    code_hash = generate_password_hash(code)
+    expires = (datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_TTL_MINUTES)).isoformat()
+    # Invalidate any prior unused codes for this user
+    execute("UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0", (user_id,))
+    execute(
+        "INSERT INTO password_resets (user_id, code_hash, expires_at, used) VALUES (?,?,?,0)",
+        (user_id, code_hash, expires),
+    )
+    return code
+
+
+def verify_reset_code(email: str, code: str):
+    """Returns user_id if valid, None otherwise."""
+    user = get_user_by_email(email)
+    if not user:
+        return None
+    rows = query_all(
+        "SELECT * FROM password_resets WHERE user_id = ? AND used = 0 ORDER BY id DESC",
+        (user["id"],),
+    )
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        try:
+            expires = datetime.fromisoformat(row["expires_at"])
+        except (TypeError, ValueError):
+            continue
+        if now > expires:
+            continue
+        if check_password_hash(row["code_hash"], code):
+            return user["id"]
+    return None
+
+
+def update_password(user_id: int, new_password: str):
+    pw_hash = generate_password_hash(new_password)
+    execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, user_id))
+    execute("UPDATE password_resets SET used = 1 WHERE user_id = ?", (user_id,))
 
 
 def login_or_create_google_user(google_info):

@@ -773,3 +773,19 @@ input[type="color"] {
 .btn-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
 .btn-danger:hover { background: #fee2e2; }
 .muted { color: var(--text3); font-weight: 400; }
+
+/* ── Password toggle ────────────────────────────────────── */
+.pw-wrap { position: relative; display: flex; align-items: center; }
+.pw-wrap input { flex: 1; padding-right: 60px; }
+.pw-toggle {
+  position: absolute; right: 8px;
+  background: none; border: none; cursor: pointer;
+  font-size: .8rem; font-weight: 600; color: var(--primary);
+  padding: 6px 10px; border-radius: 4px;
+}
+.pw-toggle:hover { background: #eef2ff; }
+.forgot-link {
+  display: inline-block; margin-top: .5rem;
+  font-size: .85rem; color: var(--primary); text-decoration: none; font-weight: 600;
+}
+.forgot-link:hover { text-decoration: underline; }

@@ -16,7 +16,9 @@ from tracker.database import init_db, CATEGORY_DEFAULTS
 from tracker.auth import (
     get_user_by_id, get_user_by_email, create_user, verify_password,
     verify_google_token, login_or_create_google_user, GOOGLE_CLIENT_ID,
+    create_password_reset, verify_reset_code, update_password,
 )
+from tracker.email_util import send_email
 from tracker.logic import (
     add_habit, get_habits_with_status, toggle_log,
     get_habit_stats, get_habit_calendar,
@@ -103,6 +105,48 @@ def signup():
 def logout():
     logout_user()
     return redirect(url_for("login"))
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        user = get_user_by_email(email)
+        if user and user.get("password_hash"):
+            code = create_password_reset(user["id"])
+            send_email(
+                email,
+                "HabitFlow password reset code",
+                f"Your HabitFlow password reset code is:\n\n{code}\n\n"
+                f"This code expires in 15 minutes. If you didn't request this, ignore this email.",
+            )
+        flash("If that email exists, we've sent a reset code. Check your inbox.", "success")
+        return redirect(url_for("reset_password_route", email=email))
+    return render_template("forgot_password.html")
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password_route():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+    email = request.values.get("email", "")
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        code = request.form.get("code", "").strip()
+        new_pw = request.form.get("new_password", "")
+        if len(new_pw) < 6:
+            flash("Password must be at least 6 characters.", "error")
+            return render_template("reset_password.html", email=email)
+        user_id = verify_reset_code(email, code)
+        if not user_id:
+            flash("Invalid or expired code.", "error")
+            return render_template("reset_password.html", email=email)
+        update_password(user_id, new_pw)
+        flash("Password updated. Please sign in.", "success")
+        return redirect(url_for("login"))
+    return render_template("reset_password.html", email=email)
 
 
 @app.route("/auth/google", methods=["POST"])

@@ -4,7 +4,9 @@ from flask import Blueprint, request, jsonify
 from tracker.auth import (
     decode_jwt, make_jwt, get_user_by_email, verify_password, create_user,
     get_user_by_id, verify_google_token, login_or_create_google_user,
+    create_password_reset, verify_reset_code, update_password,
 )
+from tracker.email_util import send_email
 from tracker.logic import (
     add_habit, get_habits_with_status, toggle_log,
     get_habit_stats, get_habit_calendar,
@@ -84,6 +86,38 @@ def google_signin():
 @jwt_required
 def me():
     return jsonify({"user": request.user.to_dict()})
+
+
+@api.post("/auth/forgot-password")
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    user = get_user_by_email(email)
+    # Don't reveal whether the email exists
+    if user and user.get("password_hash"):
+        code = create_password_reset(user["id"])
+        send_email(
+            email,
+            "HabitFlow password reset code",
+            f"Your HabitFlow password reset code is:\n\n{code}\n\n"
+            f"This code expires in 15 minutes. If you didn't request this, ignore this email.",
+        )
+    return jsonify({"ok": True, "message": "If that email exists, a reset code has been sent."})
+
+
+@api.post("/auth/reset-password")
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    code = (data.get("code") or "").strip()
+    new_password = data.get("new_password") or ""
+    if not email or not code or len(new_password) < 6:
+        return jsonify({"error": "email, code, and new password (≥6 chars) required"}), 400
+    user_id = verify_reset_code(email, code)
+    if not user_id:
+        return jsonify({"error": "invalid or expired code"}), 400
+    update_password(user_id, new_password)
+    return jsonify({"ok": True, "message": "Password updated. You can now sign in."})
 
 
 # ── Habits ────────────────────────────────────────────────────────────────────
